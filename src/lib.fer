@@ -1,0 +1,9 @@
+/// Adds two numbers.
+pub fn add(a: Int, b: Int) -> Int {
+  return a + b
+}
+
+#[test("add sums its arguments")]
+fn add_sums_its_arguments() -> Unit {
+  expect.equal(add(2, 3), 5)
+}

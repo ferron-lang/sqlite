@@ -1,0 +1,9 @@
+[package]
+name = "sqlite"
+version = "0.1.0"
+ferron = ">=0.6.0-alpha.1"
+license = "MIT"
+ffi = true
+
+[native]
+link = ["sqlite3"]
