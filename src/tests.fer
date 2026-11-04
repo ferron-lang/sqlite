@@ -6,8 +6,10 @@ use std.data.Value
 use pkg.database.Database
 use pkg.error.SqliteError
 
+// Test types carry a `Test` prefix: a consumer's type of the same name
+// would otherwise share their generic instantiations (a compiler bug).
 #[derive(Data)]
-struct Person {
+struct TestPerson {
   id: Int,
   name: String,
   age: Option[Int],
@@ -33,7 +35,7 @@ fn rows(db: Database, sql: String) -> String {
 
 /// The names of the people `sql` selects.
 fn names(db: Database, sql: String) -> String {
-  let result: Result[List[Person], SqliteError] = db.query(sql, Value.Null)
+  let result: Result[List[TestPerson], SqliteError] = db.query(sql, Value.Null)
   match result {
     Ok(people) => return "{people.map(|person| person.name)}"
     Err(error) => return "error {error}"

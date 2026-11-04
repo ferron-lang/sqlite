@@ -35,7 +35,12 @@ jobs:
           cargo build --release -p anvil-cli
           echo "$PWD/target/release" >> "$GITHUB_PATH"
       - run: anvil check
-      - run: anvil test
+      # The tests close every connection, statement, and transaction; the
+      # runtime's handle metrics confirm nothing they used is left alive.
+      - name: anvil test
+        run: |
+          FERRON_NATIVE_HANDLE_METRICS_PATH="$RUNNER_TEMP/handles.txt" anvil test
+          grep -x live_handles=0 "$RUNNER_TEMP/handles.txt"
       - run: anvil fmt --check
       # Last: on a mismatch it regenerates src/sys/ to show the difference.
       - name: anvil ffi gen --check
