@@ -1,0 +1,37 @@
+# `anvil ffi gen` writes `src/sys/sqlite3.fer` from the system `sqlite3.h`;
+# `anvil ffi gen --check` compares it in CI.
+#
+# Every SQLite 3.x header declares a different set of functions (each
+# release adds some, and compile options such as SQLITE_OMIT_* hide others),
+# so the binding is pinned to the API the safe layer uses: `ignore` drops
+# every name and `require` brings back exactly those below. A header that
+# lacks one fails `ffi gen` at that name; the output never depends on the
+# local SQLite version. Using another function means adding it here.
+[generate]
+headers = ["sqlite3.h", "sqlite3_handles.h"]
+include = ["include", "/usr/include"]
+output = "src/sys"
+allow = "^sqlite3_"
+ignore = "."
+require = [
+  # Types.
+  "sqlite3_stmt", "sqlite3_int64", "sqlite3_ptr", "sqlite3_stmt_ptr",
+  # Connections (3.0; `sqlite3_close_v2` 3.7.14, `total_changes64` 3.37).
+  "sqlite3_open", "sqlite3_close_v2", "sqlite3_errmsg", "sqlite3_extended_errcode",
+  "sqlite3_last_insert_rowid", "sqlite3_total_changes64", "sqlite3_complete",
+  "sqlite3_next_stmt",
+  # Statements.
+  "sqlite3_prepare_v2", "sqlite3_step", "sqlite3_finalize",
+  "sqlite3_bind_parameter_count", "sqlite3_bind_parameter_name",
+  "sqlite3_bind_null", "sqlite3_bind_int64", "sqlite3_bind_double",
+  "sqlite3_column_count", "sqlite3_column_name", "sqlite3_column_type",
+  "sqlite3_column_int64", "sqlite3_column_double", "sqlite3_column_text",
+  "sqlite3_column_blob", "sqlite3_column_bytes",
+]
+
+# `sqlite3 **ppDb` and `sqlite3_stmt **ppStmt` are one value written by C.
+[arrays.sqlite3_open]
+out = ["ppDb"]
+
+[arrays.sqlite3_prepare_v2]
+out = ["ppStmt", "pzTail"]
