@@ -1,0 +1,355 @@
+// SQL features end to end through `Database`: schemas, inserts, selects,
+// updates and deletes (the cases of the former `std.sqlite` fixtures), and
+// what the real engine adds: indexes, joins, aggregates.
+
+use std.data.Value
+use pkg.database.Database
+use pkg.error.SqliteError
+
+#[derive(Data)]
+struct Person {
+  id: Int,
+  name: String,
+  age: Option[Int],
+  city: Option[String],
+}
+
+/// `ok <changes>` or `error <error>`.
+fn exec[P](db: Database, sql: String, params: P) -> String {
+  match db.execute(sql, params) {
+    Ok(changes) => return "ok {changes}"
+    Err(error) => return "error {error}"
+  }
+}
+
+/// The rows of `sql` as `Value`s, or `error <error>`.
+fn rows(db: Database, sql: String) -> String {
+  let result: Result[List[Value], SqliteError] = db.query(sql, Value.Null)
+  match result {
+    Ok(rows) => return "{rows}"
+    Err(error) => return "error {error}"
+  }
+}
+
+/// The names of the people `sql` selects.
+fn names(db: Database, sql: String) -> String {
+  let result: Result[List[Person], SqliteError] = db.query(sql, Value.Null)
+  match result {
+    Ok(people) => return "{people.map(|person| person.name)}"
+    Err(error) => return "error {error}"
+  }
+}
+
+fn people() -> Database {
+  let db = Database.memory()
+  let _ = db.execute(
+    "CREATE TABLE people (id INTEGER PRIMARY KEY, name TEXT, age INTEGER, city TEXT);
+     INSERT INTO people (name, age, city) VALUES
+       ('ann', 31, 'oslo'), ('bob', 25, NULL), ('cy', NULL, 'rome'),
+       ('dee', 40, 'oslo'), ('eve', 25, 'lima'), ('fay', 19, 'rome')",
+    Value.Null,
+  ).expect_ok("create people")
+  return move db
+}
+
+#[test("CREATE TABLE and DROP TABLE keep sqlite_schema; errors carry SQLite's message")]
+fn schema() -> Unit {
+  let db = Database.memory()
+  expect.equal(
+    exec(
+      db,
+      "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, age INT DEFAULT 18)",
+      Value.Null
+    ),
+    "ok 0"
+  )
+  expect.equal(exec(db, "create table if not exists Users (x)", Value.Null), "ok 0")
+  expect.equal(
+    exec(db, "CREATE TABLE \"order items\" (sku VARCHAR(20), qty, price DECIMAL(10, 2))", Value.Null),
+    "ok 0"
+  )
+  expect.equal(
+    rows(db, "SELECT type, name, sql FROM sqlite_schema ORDER BY name"),
+    "[Map({{type: String(table), name: String(order items), sql: String(CREATE TABLE \"order items\" (sku VARCHAR(20), qty, price DECIMAL(10, 2)))}}), Map({{type: String(table), name: String(users), sql: String(CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT NOT NULL, age INT DEFAULT 18))}})]",
+  )
+  expect.equal(exec(db, "CREATE TABLE users (x)", Value.Null), "error Sql: table users already exists")
+  expect.equal(
+    exec(db, "CREATE TABLE sqlite_x (x)", Value.Null),
+    "error Sql: object name reserved for internal use: sqlite_x"
+  )
+  expect.equal(exec(db, "CREATE TABLE d (a, A)", Value.Null), "error Sql: duplicate column name: A")
+  expect.equal(exec(db, "CREATE TABLE (x)", Value.Null), "error Sql: near \"(\": syntax error")
+  // What the former engine could not do.
+  expect.equal(exec(db, "CREATE TABLE u (email TEXT UNIQUE)", Value.Null), "ok 0")
+  expect.equal(exec(db, "CREATE TABLE k (code TEXT PRIMARY KEY)", Value.Null), "ok 0")
+  expect.equal(exec(db, "CREATE TABLE c (n INT CHECK (n > 0))", Value.Null), "ok 0")
+  expect.equal(exec(db, "CREATE TABLE a (id INTEGER PRIMARY KEY AUTOINCREMENT)", Value.Null), "ok 0")
+  expect.equal(exec(db, "CREATE TABLE w (id INTEGER PRIMARY KEY) WITHOUT ROWID", Value.Null), "ok 0")
+  expect.equal(
+    exec(db, "INSERT INTO u VALUES ('a@x'); INSERT INTO u VALUES ('a@x')", Value.Null),
+    "error Constraint: UNIQUE constraint failed: u.email"
+  )
+  expect.equal(
+    exec(db, "INSERT INTO c VALUES (0)", Value.Null),
+    "error Constraint: CHECK constraint failed: n > 0"
+  )
+  expect.equal(exec(db, "ALTER TABLE users ADD COLUMN email TEXT", Value.Null), "ok 0")
+  expect.equal(exec(db, "DROP TABLE \"order items\"", Value.Null), "ok 0")
+  expect.equal(exec(db, "DROP TABLE missing", Value.Null), "error Sql: no such table: missing")
+  expect.equal(exec(db, "DROP TABLE IF EXISTS missing", Value.Null), "ok 0")
+  expect.equal(
+    exec(db, "DROP TABLE sqlite_schema", Value.Null),
+    "error Sql: table sqlite_master may not be dropped"
+  )
+  expect.equal(rows(db, "SELECT * FROM \"order items\""), "error Sql: no such table: order items")
+  expect.equal(
+    rows(db, "SELECT name FROM sqlite_schema WHERE type = 'table' ORDER BY name"),
+    "[Map({{name: String(a)}}), Map({{name: String(c)}}), Map({{name: String(k)}}), Map({{name: String(sqlite_sequence)}}), Map({{name: String(u)}}), Map({{name: String(users)}}), Map({{name: String(w)}})]",
+  )
+}
+
+#[test("INSERT applies defaults, affinity, and constraints; a failing statement changes nothing")]
+fn insert() -> Unit {
+  let db = Database.memory()
+  expect.equal(
+    exec(
+      db,
+      "CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT NOT NULL, qty INT DEFAULT 1, price REAL, note)",
+      Value.Null
+    ),
+    "ok 0"
+  )
+  expect.equal(exec(db, "INSERT INTO items (name, qty, price) VALUES ('apple', 3, 0.5)", Value.Null), "ok 1")
+  expect.equal(db.last_insert_rowid(), 1)
+  expect.equal(exec(db, "INSERT INTO items (name) VALUES ('pear'), ('plum')", Value.Null), "ok 2")
+  expect.equal(db.last_insert_rowid(), 3)
+  expect.equal(exec(db, "INSERT INTO items VALUES (10, 'fig', 2, 4, x'00ff')", Value.Null), "ok 1")
+  // Column affinity: text that looks like a number becomes one in a
+  // numeric column, and numbers become text in a TEXT column.
+  expect.equal(
+    exec(db, "INSERT INTO items (name, qty, price, note) VALUES (42, '7', '2.50', '8')", Value.Null),
+    "ok 1"
+  )
+  expect.equal(exec(db, "INSERT INTO items (id, name) VALUES ('20', 'twenty')", Value.Null), "ok 1")
+  expect.equal(db.last_insert_rowid(), 20)
+  let all = "[Map({{rowid: Int(1), id: Int(1), name: String(apple), qty: Int(3), price: Float(0.5), note: Null}}), Map({{rowid: Int(2), id: Int(2), name: String(pear), qty: Int(1), price: Null, note: Null}}), Map({{rowid: Int(3), id: Int(3), name: String(plum), qty: Int(1), price: Null, note: Null}}), Map({{rowid: Int(10), id: Int(10), name: String(fig), qty: Int(2), price: Float(4), note: String(AP8=)}}), Map({{rowid: Int(11), id: Int(11), name: String(42), qty: Int(7), price: Float(2.5), note: String(8)}}), Map({{rowid: Int(20), id: Int(20), name: String(twenty), qty: Int(1), price: Null, note: Null}})]"
+  // SQLite names a bare `rowid` after its INTEGER PRIMARY KEY alias (`id`).
+  expect.equal(rows(db, "SELECT rowid AS rowid, * FROM items"), all)
+  expect.equal(
+    exec(db, "INSERT INTO items (name) VALUES (NULL)", Value.Null),
+    "error Constraint: NOT NULL constraint failed: items.name"
+  )
+  expect.equal(
+    exec(db, "INSERT INTO items (id, name) VALUES (30, 'a'), (10, 'dup')", Value.Null),
+    "error Constraint: UNIQUE constraint failed: items.id"
+  )
+  expect.equal(
+    exec(db, "INSERT INTO items (id, name) VALUES ('x', 'bad')", Value.Null),
+    "error Mismatch: datatype mismatch"
+  )
+  expect.equal(
+    exec(db, "INSERT INTO items VALUES (1, 2)", Value.Null),
+    "error Sql: table items has 5 columns but 2 values were supplied"
+  )
+  expect.equal(
+    exec(db, "INSERT INTO items (name, qty) VALUES ('a')", Value.Null),
+    "error Sql: 1 values for 2 columns"
+  )
+  expect.equal(
+    exec(db, "INSERT INTO items (nope) VALUES (1)", Value.Null),
+    "error Sql: table items has no column named nope"
+  )
+  expect.equal(exec(db, "INSERT INTO missing VALUES (1)", Value.Null), "error Sql: no such table: missing")
+  expect.equal(rows(db, "SELECT rowid AS rowid, * FROM items"), all)
+  // Rows larger than a page use overflow pages.
+  expect.equal(exec(db, "INSERT INTO items (name) VALUES (?)", "x".repeat(5000)), "ok 1")
+  expect.equal(rows(db, "SELECT length(name) AS n FROM items WHERE id = 21"), "[Map({{n: Int(5000)}})]")
+  expect.equal(
+    exec(db, "CREATE TABLE empty (a DEFAULT 5, b); INSERT INTO empty DEFAULT VALUES", Value.Null),
+    "ok 1"
+  )
+  expect.equal(rows(db, "SELECT rowid, * FROM empty"), "[Map({{rowid: Int(1), a: Int(5), b: Null}})]")
+}
+
+#[test("SELECT filters with WHERE, sorts with ORDER BY, and pages with LIMIT and OFFSET")]
+fn select() -> Unit {
+  let db = people()
+  expect.equal(names(db, "SELECT * FROM people"), "[ann, bob, cy, dee, eve, fay]")
+  // Comparisons, with affinity: the text '25' compares as a number.
+  expect.equal(names(db, "SELECT * FROM people WHERE age = 25"), "[bob, eve]")
+  expect.equal(names(db, "SELECT * FROM people WHERE age == '25'"), "[bob, eve]")
+  expect.equal(names(db, "SELECT * FROM people WHERE city <> 'oslo'"), "[cy, eve, fay]")
+  expect.equal(names(db, "SELECT * FROM people WHERE age < 25"), "[fay]")
+  expect.equal(names(db, "SELECT * FROM people WHERE age <= 25"), "[bob, eve, fay]")
+  expect.equal(names(db, "SELECT * FROM people WHERE name > 'cy'"), "[dee, eve, fay]")
+  expect.equal(names(db, "SELECT * FROM people WHERE id >= 5"), "[eve, fay]")
+  // AND, OR, NOT, and NULL's three-valued logic.
+  expect.equal(names(db, "SELECT * FROM people WHERE age > 20 AND city = 'oslo'"), "[ann, dee]")
+  expect.equal(names(db, "SELECT * FROM people WHERE age < 20 OR city = 'lima'"), "[eve, fay]")
+  expect.equal(names(db, "SELECT * FROM people WHERE NOT city = 'oslo'"), "[cy, eve, fay]")
+  expect.equal(
+    names(db, "SELECT * FROM people WHERE city = 'rome' OR city = 'oslo' AND age > 35"),
+    "[cy, dee, fay]"
+  )
+  expect.equal(names(db, "SELECT * FROM people WHERE (city = 'rome' OR city = 'oslo') AND age > 35"), "[dee]")
+  expect.equal(names(db, "SELECT * FROM people WHERE age IS NULL"), "[cy]")
+  expect.equal(
+    names(db, "SELECT * FROM people WHERE city IS NOT NULL AND age IS NOT NULL"),
+    "[ann, dee, eve, fay]"
+  )
+  expect.equal(names(db, "SELECT * FROM people WHERE city IS NULL OR city IS 'lima'"), "[bob, eve]")
+  expect.equal(names(db, "SELECT * FROM people WHERE age * 2 + 1 > 60"), "[ann, dee]")
+  // ORDER BY: ascending puts NULL first; several keys, positions, aliases.
+  expect.equal(names(db, "SELECT * FROM people ORDER BY age, id"), "[cy, fay, bob, eve, ann, dee]")
+  expect.equal(names(db, "SELECT * FROM people ORDER BY age DESC, name DESC"), "[dee, ann, eve, bob, fay, cy]")
+  expect.equal(names(db, "SELECT * FROM people ORDER BY 4, 2"), "[bob, eve, ann, dee, cy, fay]")
+  expect.equal(
+    rows(
+      db,
+      "SELECT name AS who, age * 10 AS score FROM people WHERE age IS NOT NULL ORDER BY score DESC, who"
+    ),
+    "[Map({{who: String(dee), score: Int(400)}}), Map({{who: String(ann), score: Int(310)}}), Map({{who: String(bob), score: Int(250)}}), Map({{who: String(eve), score: Int(250)}}), Map({{who: String(fay), score: Int(190)}})]",
+  )
+  // LIMIT and OFFSET.
+  expect.equal(names(db, "SELECT * FROM people ORDER BY id LIMIT 2"), "[ann, bob]")
+  expect.equal(names(db, "SELECT * FROM people ORDER BY id LIMIT 2 OFFSET 3"), "[dee, eve]")
+  expect.equal(names(db, "SELECT * FROM people ORDER BY id LIMIT 4, 1"), "[eve]")
+  expect.equal(names(db, "SELECT * FROM people ORDER BY id LIMIT -1 OFFSET 4"), "[eve, fay]")
+  // Columns, expressions, and SELECT without a table.
+  expect.equal(
+    rows(db, "SELECT name, city FROM people WHERE id = 1"),
+    "[Map({{name: String(ann), city: String(oslo)}})]"
+  )
+  expect.equal(
+    rows(db, "SELECT rowid, people.name, id + 100 FROM people WHERE id < 3"),
+    "[Map({{id: Int(1), name: String(ann), id + 100: Int(101)}}), Map({{id: Int(2), name: String(bob), id + 100: Int(102)}})]",
+  )
+  expect.equal(
+    rows(
+      db,
+      "SELECT 7 / 2, 7.0 / 2, 7 % 3, 1 / 0, 'a' || 'b' || 3, -age, NULL IS NULL FROM people WHERE id = 1"
+    ),
+    "[Map({{7 / 2: Int(3), 7.0 / 2: Float(3.5), 7 % 3: Int(1), 1 / 0: Null, 'a' || 'b' || 3: String(ab3), -age: Int(-31), NULL IS NULL: Int(1)}})]",
+  )
+  expect.equal(
+    rows(db, "SELECT 1 + 1 AS two, 'x' AS x, NULL, 2.5"),
+    "[Map({{two: Int(2), x: String(x), NULL: Null, 2.5: Float(2.5)}})]"
+  )
+  expect.equal(
+    rows(db, "SELECT 1 < 'a', 'a' < x'00', NULL = NULL, NULL AND 0, NULL OR 1"),
+    "[Map({{1 < 'a': Int(1), 'a' < x'00': Int(1), NULL = NULL: Null, NULL AND 0: Int(0), NULL OR 1: Int(1)}})]",
+  )
+  // Errors.
+  expect.equal(rows(db, "SELECT nope FROM people"), "error Sql: no such column: nope")
+  expect.equal(rows(db, "SELECT * FROM nowhere"), "error Sql: no such table: nowhere")
+  expect.equal(rows(db, "SELECT * FROM people WHERE"), "error Sql: incomplete input")
+  expect.equal(
+    rows(db, "SELECT name FROM people ORDER BY 3"),
+    "error Sql: 1st ORDER BY term out of range - should be between 1 and 1"
+  )
+  // Only the last statement's rows come back.
+  expect.equal(rows(db, "SELECT 1 AS a; SELECT 2 AS b;"), "[Map({{b: Int(2)}})]")
+}
+
+#[test("UPDATE and DELETE report how many rows they changed")]
+fn update_delete() -> Unit {
+  let db = Database.memory()
+  expect.equal(
+    exec(
+      db,
+      "CREATE TABLE stock (id INTEGER PRIMARY KEY, item TEXT NOT NULL, qty INT); INSERT INTO stock (item, qty) VALUES ('nut', 10), ('bolt', 0), ('gear', 3), ('cog', NULL)",
+      Value.Null
+    ),
+    "ok 4",
+  )
+  expect.equal(exec(db, "UPDATE stock SET qty = qty + 5 WHERE qty < 5", Value.Null), "ok 2")
+  expect.equal(exec(db, "UPDATE stock SET item = item || '!', qty = 1 WHERE qty IS NULL", Value.Null), "ok 1")
+  expect.equal(exec(db, "UPDATE stock SET qty = '12' WHERE item = 'nut'", Value.Null), "ok 1")
+  expect.equal(exec(db, "UPDATE stock SET qty = 0 WHERE id > 100", Value.Null), "ok 0")
+  expect.equal(
+    rows(db, "SELECT * FROM stock ORDER BY id"),
+    "[Map({{id: Int(1), item: String(nut), qty: Int(12)}}), Map({{id: Int(2), item: String(bolt), qty: Int(5)}}), Map({{id: Int(3), item: String(gear), qty: Int(8)}}), Map({{id: Int(4), item: String(cog!), qty: Int(1)}})]",
+  )
+  // Changing the INTEGER PRIMARY KEY moves the row.
+  expect.equal(exec(db, "UPDATE stock SET id = 50 WHERE item = 'bolt'", Value.Null), "ok 1")
+  expect.equal(
+    exec(db, "UPDATE stock SET id = 50 WHERE item = 'gear'", Value.Null),
+    "error Constraint: UNIQUE constraint failed: stock.id"
+  )
+  expect.equal(
+    exec(db, "UPDATE stock SET item = NULL", Value.Null),
+    "error Constraint: NOT NULL constraint failed: stock.item"
+  )
+  expect.equal(exec(db, "UPDATE stock SET missing = 1", Value.Null), "error Sql: no such column: missing")
+  expect.equal(exec(db, "DELETE FROM stock WHERE qty >= 8", Value.Null), "ok 2")
+  expect.equal(exec(db, "DELETE FROM stock WHERE id = 999", Value.Null), "ok 0")
+  expect.equal(
+    rows(db, "SELECT * FROM stock ORDER BY id"),
+    "[Map({{id: Int(4), item: String(cog!), qty: Int(1)}}), Map({{id: Int(50), item: String(bolt), qty: Int(5)}})]",
+  )
+  for i in 0..400 {
+    expect.equal(exec(db, "INSERT INTO stock (item, qty) VALUES (?, ?)", ("part {i}", i)), "ok 1")
+  }
+  expect.equal(exec(db, "DELETE FROM stock WHERE qty % 7 <> 0", Value.Null), "ok 344")
+  expect.equal(rows(db, "SELECT count(*) AS n FROM stock"), "[Map({{n: Int(58)}})]")
+  expect.equal(exec(db, "UPDATE stock SET qty = -qty", Value.Null), "ok 58")
+  expect.equal(exec(db, "DELETE FROM stock", Value.Null), "ok 58")
+  expect.equal(rows(db, "SELECT * FROM stock"), "[]")
+}
+
+#[test("an index serves lookups and enforces UNIQUE")]
+fn indexes() -> Unit {
+  let db = people()
+  expect.equal(exec(db, "CREATE INDEX people_city ON people (city)", Value.Null), "ok 0")
+  expect.equal(exec(db, "CREATE UNIQUE INDEX people_name ON people (name)", Value.Null), "ok 0")
+  let plan: Result[List[Value], SqliteError] = db.query("EXPLAIN QUERY PLAN SELECT name FROM people WHERE city = ?", "oslo")
+  let detail = "{plan.expect_ok("explain")}"
+  expect.equal(detail.contains("USING INDEX people_city"), true)
+  expect.equal(
+    names(db, "SELECT * FROM people INDEXED BY people_city WHERE city = 'oslo' ORDER BY id"),
+    "[ann, dee]"
+  )
+  expect.equal(
+    exec(db, "INSERT INTO people (name) VALUES ('ann')", Value.Null),
+    "error Constraint: UNIQUE constraint failed: people.name"
+  )
+  expect.equal(exec(db, "DROP INDEX people_name; INSERT INTO people (name) VALUES ('ann')", Value.Null), "ok 1")
+}
+
+#[test("JOIN combines tables and GROUP BY aggregates them")]
+fn joins_and_aggregates() -> Unit {
+  let db = people()
+  expect.equal(
+    exec(
+      db,
+      "CREATE TABLE pets (owner INTEGER REFERENCES people (id), pet TEXT); INSERT INTO pets VALUES (1, 'cat'), (1, 'dog'), (4, 'fish'), (9, 'owl')",
+      Value.Null
+    ),
+    "ok 4",
+  )
+  expect.equal(
+    rows(
+      db,
+      "SELECT people.name, pets.pet FROM people JOIN pets ON pets.owner = people.id ORDER BY pets.pet"
+    ),
+    "[Map({{name: String(ann), pet: String(cat)}}), Map({{name: String(ann), pet: String(dog)}}), Map({{name: String(dee), pet: String(fish)}})]",
+  )
+  expect.equal(
+    rows(
+      db,
+      "SELECT p.name, count(pets.pet) AS pets FROM people p LEFT JOIN pets ON pets.owner = p.id WHERE p.id <= 2 GROUP BY p.id ORDER BY p.id"
+    ),
+    "[Map({{name: String(ann), pets: Int(2)}}), Map({{name: String(bob), pets: Int(0)}})]",
+  )
+  expect.equal(
+    rows(
+      db,
+      "SELECT city, count(*) AS n, avg(age) AS age FROM people WHERE city IS NOT NULL GROUP BY city HAVING n > 1 ORDER BY city"
+    ),
+    "[Map({{city: String(oslo), n: Int(2), age: Float(35.5)}}), Map({{city: String(rome), n: Int(2), age: Float(19)}})]",
+  )
+  expect.equal(
+    rows(db, "SELECT min(age) AS lo, max(age) AS hi, sum(age) AS total FROM people"),
+    "[Map({{lo: Int(19), hi: Int(40), total: Int(140)}})]"
+  )
+}

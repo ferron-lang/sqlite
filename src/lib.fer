@@ -1,9 +1,15 @@
-/// Adds two numbers.
-pub fn add(a: Int, b: Int) -> Int {
-  return a + b
-}
+// `sqlite`: SQLite 3 through the system `libsqlite3`.
+//
+// - `Database`: a connection (a file or in memory) with `execute` and
+//   `query`, parameters bound by position or name, and rows decoded through
+//   `FromData`.
+// - `Transaction`: a resource that commits on `commit` and rolls back when
+//   it closes otherwise.
+// - `SqliteError`, `SqliteErrorKind`: what failed, with SQLite's message.
+//
+// `pkg.sys` holds the generated `extern "C"` module (`anvil ffi gen`) and
+// the hand-written `pkg.sys.hand`; they stay inside this package. Each
+// module holds its own tests; `pkg.tests` holds the SQL features end to end.
 
-#[test("add sums its arguments")]
-fn add_sums_its_arguments() -> Unit {
-  expect.equal(add(2, 3), 5)
-}
+pub use pkg.database.{Database, Transaction}
+pub use pkg.error.{SqliteError, SqliteErrorKind}

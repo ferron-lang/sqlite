@@ -1,0 +1,112 @@
+// `sqlite.error`: `SqliteError`, the failure every fallible call returns:
+// its kind from SQLite's result code, the extended code, and SQLite's
+// message (`sqlite3_errmsg`).
+
+use std.data.DataErrorKind
+use std.error.Error
+use std.ffi.Ptr
+use pkg.sys.sqlite3.{sqlite3, sqlite3_errmsg, sqlite3_extended_errcode}
+
+/// Why a SQLite operation failed: the class of its primary result code, or
+/// a failure of this package's own (`Parameter`, `Decode`).
+#[derive(Eq, Hash)]
+pub type SqliteErrorKind =
+  /// `SQLITE_ERROR`: the SQL does not parse, names a table or column that
+  /// does not exist, or fails otherwise, such as `BEGIN` inside a
+  /// transaction.
+  | Sql
+/// `SQLITE_CONSTRAINT`: a `NOT NULL`, `UNIQUE`, `PRIMARY KEY`, `CHECK`,
+/// or foreign key constraint failed.
+  | Constraint
+/// `SQLITE_MISMATCH`: a value of the wrong type, such as text for an
+/// `INTEGER PRIMARY KEY`.
+  | Mismatch
+/// `SQLITE_BUSY` or `SQLITE_LOCKED`: another connection holds a lock.
+  | Busy
+/// `SQLITE_READONLY`: the database cannot be written.
+  | ReadOnly
+/// `SQLITE_TOOBIG`: a string, blob, or row exceeds SQLite's limits.
+  | TooLarge
+/// `SQLITE_CORRUPT` or `SQLITE_NOTADB`: the file is not a sound SQLite
+/// database.
+  | Corrupt
+/// `SQLITE_CANTOPEN`: the file cannot be opened or created.
+  | CantOpen
+/// `SQLITE_IOERR` or `SQLITE_FULL`: the operating system failed to read
+/// or write, or the disk is full.
+  | Io
+/// `SQLITE_MISUSE` or `SQLITE_RANGE`: SQLite was called the wrong way.
+  | Misuse
+/// A parameter is missing or cannot be bound, such as a nested list.
+  | Parameter
+/// A row could not be decoded into the requested type.
+  | Decode(kind: DataErrorKind)
+/// Any other result code (`SQLITE_NOMEM`, `SQLITE_INTERRUPT`, ...); see
+/// `SqliteError.code`.
+  | Other
+
+/// A failed SQLite operation: its kind, SQLite's extended result code (0
+/// for `Parameter` and `Decode`), and the message.
+#[derive(Eq)]
+pub struct SqliteError {
+  pub kind: SqliteErrorKind,
+  pub code: Int,
+  pub message: String,
+}
+
+impl Error for SqliteError {
+}
+
+impl Display for SqliteError {
+  /// `<kind>: <message>`, such as `Sql: no such table: users`.
+  fn to_string(self) -> String {
+    return "{self.kind}: {self.message}"
+  }
+}
+
+/// The error SQLite last reported on `db` (null when opening ran out of
+/// memory): its extended code and `sqlite3_errmsg`.
+pub(pkg) fn last_error(db: Ptr[sqlite3]) -> SqliteError {
+  let code = Int.from(sqlite3_extended_errcode(db))
+  let message = String.from_c(sqlite3_errmsg(db)).unwrap_or("<not UTF-8>")
+  return SqliteError { kind: kind_of(code & 255), code: code, message: message }
+}
+
+/// A failure of this package's own, with no SQLite result code.
+pub(pkg) fn failure(kind: SqliteErrorKind, message: String) -> SqliteError {
+  return SqliteError { kind: kind, code: 0, message: message }
+}
+
+fn kind_of(primary: Int) -> SqliteErrorKind {
+  return match primary {
+    1 => Sql
+    5 | 6 => Busy
+    8 => ReadOnly
+    10 | 13 => Io
+    11 | 26 => Corrupt
+    14 => CantOpen
+    18 => TooLarge
+    19 => Constraint
+    20 => Mismatch
+    21 | 25 => Misuse
+    _ => Other
+  }
+}
+
+#[test("result codes map to kinds by their primary code")]
+fn result_codes_map_to_kinds() -> Unit {
+  expect.equal(kind_of(1), Sql)
+  expect.equal(kind_of(19), Constraint)
+  // SQLITE_CONSTRAINT_UNIQUE (2067) & 255 is SQLITE_CONSTRAINT.
+  expect.equal(kind_of(2067 & 255), Constraint)
+  expect.equal(kind_of(5), Busy)
+  expect.equal(kind_of(6), Busy)
+  expect.equal(kind_of(26), Corrupt)
+  expect.equal(kind_of(7), Other)
+}
+
+#[test("an error displays its kind and message")]
+fn error_displays_kind_and_message() -> Unit {
+  expect.equal("{failure(Parameter, "no value for parameter :id")}", "Parameter: no value for parameter :id")
+  expect.equal("{failure(Decode(DataErrorKind.WrongType), "x")}", "Decode(WrongType): x")
+}
