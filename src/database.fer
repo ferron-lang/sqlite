@@ -101,13 +101,13 @@ impl Database {
   /// The database in the file at `path`, created empty when it does not
   /// exist. `fs` is the capability to touch files; SQLite opens the file
   /// itself.
-  pub static fn open(fs: Fs, path: Path) -> Result[Database, SqliteError] {
+  pub fn open(fs: Fs, path: Path) -> Result[Database, SqliteError] {
     let _ = fs
     return connect("{path}")
   }
 
   /// A new empty database in memory, gone when it closes.
-  pub static fn memory() -> Database {
+  pub fn memory() -> Database {
     return connect(":memory:").expect_ok("SQLite opens an in-memory database")
   }
 
