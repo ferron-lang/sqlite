@@ -201,7 +201,7 @@ fn changes(outcome: Outcome) -> Result[usize, SqliteError] {
 }
 
 fn decode[T](outcome: Outcome) -> Result[List[T], SqliteError] where T: FromData {
-  let out: List[T] = []
+  var out: List[T] = []
   for row in outcome.rows {
     match T.from_value(row) {
       Ok(decoded) => out.push(decoded)
@@ -246,11 +246,11 @@ fn run_one(db: Ptr[sqlite3], sql: String, params: Value) -> Result[Option[List[V
     return Ok(None)
   }
   bind(db, stmt, params)?
-  let names: List[String] = []
+  var names: List[String] = []
   for column in 0..size(sqlite3_column_count(stmt)) {
     names.push(String.from_c(sqlite3_column_name(stmt, c_int(column))).unwrap_or("<not UTF-8>"))
   }
-  let rows: List[Value] = []
+  var rows: List[Value] = []
   while true {
     let code = sqlite3_step(stmt)
     if code == SQLITE_DONE {
@@ -259,7 +259,7 @@ fn run_one(db: Ptr[sqlite3], sql: String, params: Value) -> Result[Option[List[V
     if code != SQLITE_ROW {
       return Err(last_error(db))
     }
-    let entries: Map[String, Value] = Map.new()
+    var entries: Map[String, Value] = Map.new()
     for (column, name) in names.enumerate() {
       entries.insert(name, column_value(stmt, c_int(column)))
     }
@@ -461,7 +461,7 @@ fn parameters() -> Unit {
     ),
     "ok 1"
   )
-  let named: Map[String, Value] = Map.new()
+  var named: Map[String, Value] = Map.new()
   named.insert("who", Value.String("eve"))
   named.insert("years", Value.Int(52))
   expect.equal(exec(db, "INSERT INTO users (name, age, admin) VALUES (@who, $years, 0)", named), "ok 1")
