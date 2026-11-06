@@ -3,6 +3,14 @@
 Versions stay `v0.x` until the API settles: the minor version marks changes
 that may break callers, the patch version marks fixes.
 
+## Unreleased
+
+- Builds under D68 value semantics: locals the package changes in place
+  are declared with `var` (applied with `anvil fix`). No API change.
+- Builds under D70, where counts and indexes are `Int`: `Database.execute`
+  and `Transaction.execute` return `Result[Int, SqliteError]` (was
+  `usize`). Migration: drop `usize` conversions and suffixes on the count.
+
 ## v0.1.0
 
 - First release: SQLite 3 through FFI over the system `libsqlite3`
