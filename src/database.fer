@@ -293,7 +293,7 @@ fn column_value(stmt: Ptr[sqlite3_stmt], column: i32) -> Value {
     return Value.String(String.from_utf8_lossy(Bytes.from_c_len(text, size(sqlite3_column_bytes(stmt, column)))))
   }
   if kind == SQLITE_BLOB {
-    let blob = sqlite3_column_blob(stmt, column)
+    let blob = sqlite3_column_blob(stmt, column).cast[u8]()
     return Value.String(encode(Bytes.from_c_len(blob, size(sqlite3_column_bytes(stmt, column)))))
   }
   return Value.Null

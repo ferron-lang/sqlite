@@ -1,8 +1,11 @@
-// Hand-written: what `anvil ffi gen` skips but the safe layer needs.
-// `sqlite3_bind_text` takes a destructor function pointer, a callback that
-// FFI stage 1 cannot express; the parameter is declared as an address-sized
-// integer, and the package only passes `SQLITE_TRANSIENT`, so SQLite copies
-// the text before the call returns (the `CStr` copy is freed after it).
+// Hand-written: what `anvil ffi gen` cannot give the safe layer yet.
+// `sqlite3_bind_text` takes a destructor function pointer, which the
+// generator writes as a `CFn`, but the package only passes
+// `SQLITE_TRANSIENT`, `(sqlite3_destructor_type)-1`, and a package cannot
+// make a `CFn` from an integer (no `CFn.cast` yet, D78). The parameter is
+// declared as an address-sized integer; with `SQLITE_TRANSIENT` SQLite
+// copies the text before the call returns (the `CStr` copy is freed after
+// it).
 
 use std.ffi.{CStr, Ptr}
 use pkg.sys.sqlite3.sqlite3_stmt

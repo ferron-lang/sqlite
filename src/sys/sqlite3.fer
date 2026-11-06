@@ -24,7 +24,7 @@ extern "C" {
   pub fn sqlite3_column_count(p_stmt: Ptr[sqlite3_stmt]) -> i32
   pub fn sqlite3_column_name(arg0: Ptr[sqlite3_stmt], n: i32) -> Ptr[u8]
   pub fn sqlite3_step(arg0: Ptr[sqlite3_stmt]) -> i32
-  pub fn sqlite3_column_blob(arg0: Ptr[sqlite3_stmt], i_col: i32) -> Ptr[u8]
+  pub fn sqlite3_column_blob(arg0: Ptr[sqlite3_stmt], i_col: i32) -> Ptr[Unit]
   pub fn sqlite3_column_double(arg0: Ptr[sqlite3_stmt], i_col: i32) -> f64
   pub fn sqlite3_column_int64(arg0: Ptr[sqlite3_stmt], i_col: i32) -> sqlite3_int64
   pub fn sqlite3_column_text(arg0: Ptr[sqlite3_stmt], i_col: i32) -> Ptr[u8]

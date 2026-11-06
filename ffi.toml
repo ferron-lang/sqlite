@@ -7,9 +7,9 @@
 # every name and `require` brings back exactly those below. A header that
 # lacks one fails `ffi gen` at that name; the output never depends on the
 # local SQLite version (checked with the 3.37.2, 3.45.1, and 3.54.0
-# headers). Using another function means adding it here. Callback
-# parameters are skipped (FFI stage 1); `src/sys/hand.fer` declares
-# `sqlite3_bind_text` by hand.
+# headers). Using another function means adding it here.
+# `src/sys/hand.fer` declares `sqlite3_bind_text` by hand: its destructor
+# is passed `SQLITE_TRANSIENT`, which no `CFn` can hold yet.
 [generate]
 headers = ["sqlite3.h"]
 include = ["/usr/include"]

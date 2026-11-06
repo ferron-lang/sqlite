@@ -119,10 +119,10 @@ anvil fmt
 pins the binding to the functions the safe layer calls (`ignore = "."` plus
 a `require` list), so the output is the same for every SQLite 3.x header
 from 3.37 on; using another function means adding it to `require`.
-`sqlite3_bind_text` takes a destructor callback,
-which the generator skips: `src/sys/hand.fer` declares it with that
-parameter as an address-sized integer, and the package always passes
-`SQLITE_TRANSIENT` (`-1`), so SQLite copies the text.
+`sqlite3_bind_text` takes a destructor callback (a `CFn` to the generator),
+but the package always passes `SQLITE_TRANSIENT` (`-1`), which no `CFn` can
+hold yet: `src/sys/hand.fer` declares it with that parameter as an
+address-sized integer, so SQLite copies the text.
 
 ## CI
 

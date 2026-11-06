@@ -3,6 +3,12 @@
 Versions stay `v0.x` until the API settles: the minor version marks changes
 that may break callers, the patch version marks fixes.
 
+## Unreleased
+
+- Regenerated with the D78 `anvil ffi gen`: `sqlite3_column_blob` returns
+  `Ptr[Unit]` (C's `void*`), cast to bytes where blobs are read. No API
+  change.
+
 ## v0.3.0
 
 - Requires `ferron >=0.8.0-alpha.1`; CI pins `FERRON_REF: v0.8.0-alpha.1`.
