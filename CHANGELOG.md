@@ -8,6 +8,9 @@ that may break callers, the patch version marks fixes.
 - Regenerated with the D78 `anvil ffi gen`: `sqlite3_column_blob` returns
   `Ptr[Unit]` (C's `void*`), cast to bytes where blobs are read. No API
   change.
+- `sqlite3_bind_text` is generated too (`src/sys/hand.fer` is gone): its
+  destructor is a `CFn` built from the `SQLITE_TRANSIENT` address with
+  D78's `CFn.of(Ptr.from_address(..))`. No API change.
 
 ## v0.3.0
 

@@ -6,11 +6,10 @@ use std.bytes.Bytes
 use std.collections.Map
 use std.data.{FromData, Value, to_value}
 use std.encoding.base64.encode
-use std.ffi.{Out, Ptr}
+use std.ffi.{CFn, Out, Ptr}
 use std.fs.{Fs, Path}
 use std.test.TestContext
 use pkg.error.{Decode, Parameter, SqliteError, SqliteErrorKind, failure, last_error}
-use pkg.sys.hand.{SQLITE_TRANSIENT, sqlite3_bind_text}
 use pkg.sys.sqlite3.{
   sqlite3,
   sqlite3_bind_double,
@@ -18,6 +17,7 @@ use pkg.sys.sqlite3.{
   sqlite3_bind_null,
   sqlite3_bind_parameter_count,
   sqlite3_bind_parameter_name,
+  sqlite3_bind_text,
   sqlite3_close_v2,
   sqlite3_column_blob,
   sqlite3_column_bytes,
@@ -45,6 +45,9 @@ const SQLITE_INTEGER: i32 = 1
 const SQLITE_FLOAT: i32 = 2
 const SQLITE_TEXT: i32 = 3
 const SQLITE_BLOB: i32 = 4
+/// `SQLITE_TRANSIENT`, `(sqlite3_destructor_type)-1`: SQLite copies the
+/// value before the call returns.
+const SQLITE_TRANSIENT: usize = 18446744073709551615usize
 
 /// A SQLite database connection, a resource closed with
 /// `sqlite3_close_v2`: a file opened with `Database.open(env.fs, path)`, or
@@ -357,8 +360,15 @@ fn bind_one(db: Ptr[sqlite3], stmt: Ptr[sqlite3_stmt], index: Int, value: Value)
     Value.Int(v) => sqlite3_bind_int64(stmt, at, v)
     Value.Float(v) => sqlite3_bind_double(stmt, at, v)
     // Text over 2 GiB passes -1 (up to the NUL), which SQLite rejects as
-    // `TooLarge`.
-    Value.String(v) => sqlite3_bind_text(stmt, at, v, v.byte_len().try_to_i32().unwrap_or(-1), SQLITE_TRANSIENT)
+    // `TooLarge`. `SQLITE_TRANSIENT` is an address, not a function: the
+    // one unchecked `CFn` the package builds.
+    Value.String(v) => sqlite3_bind_text(
+      stmt,
+      at,
+      v,
+      v.byte_len().try_to_i32().unwrap_or(-1),
+      CFn[Ptr[Unit], Unit].of(Ptr[Unit].from_address(SQLITE_TRANSIENT))
+    )
     Value.BigInt(digits) => return Err(failure(Parameter, "{digits} does not fit a 64-bit integer"))
     _ => return Err(failure(Parameter, "a list or map cannot bind a parameter"))
   }
