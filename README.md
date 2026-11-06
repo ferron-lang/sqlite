@@ -11,7 +11,7 @@ Add it to the `anvil.toml` of a package as a git dependency pinned by tag:
 
 ```toml
 [dependencies]
-sqlite = { git = "https://github.com/ferron-lang/sqlite", tag = "v0.1.0" }
+sqlite = { git = "https://github.com/ferron-lang/sqlite", tag = "v0.2.0" }
 ```
 
 and import it as `sqlite`. Programs using the package link the system
@@ -60,13 +60,13 @@ fn main(env: Env) -> Result[Unit, SqliteError] {
   when its owner's scope ends (or by `close()`). `Database.open(env.fs,
   path)` opens a file, creating it when missing; `Database.memory()` is an
   in-memory database. `execute(sql, params)` runs every statement of `sql`
-  and returns the rows they changed; `query(sql, params)` returns the rows
-  of the last statement, each decoded from a `Value.Map` of column names
-  through `FromData` (a blob arrives as base64 text). Parameters: a list or
-  tuple binds `?` and `?N` by position, a struct or `Map[String, _]` binds
-  `:name`, `@name`, and `$name`, a single scalar binds the one parameter,
-  and `Value.Null` binds none; values are bound through `sqlite3_bind_*`,
-  never spliced into the SQL.
+  and returns the number of rows they changed as an `Int`;
+  `query(sql, params)` returns the rows of the last statement, each decoded
+  from a `Value.Map` of column names through `FromData` (a blob arrives as
+  base64 text). Parameters: a list or tuple binds `?` and `?N` by position,
+  a struct or `Map[String, _]` binds `:name`, `@name`, and `$name`, a
+  single scalar binds the one parameter, and `Value.Null` binds none;
+  values are bound through `sqlite3_bind_*`, never spliced into the SQL.
 - `sqlite.database.Transaction`: `db.transaction()` runs `BEGIN`; `commit()`
   runs `COMMIT`; closing it any other way (`rollback()`, the end of a `with`
   block, an early return, a failed commit) runs `ROLLBACK`. It uses the

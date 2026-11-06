@@ -3,13 +3,23 @@
 Versions stay `v0.x` until the API settles: the minor version marks changes
 that may break callers, the patch version marks fixes.
 
-## Unreleased
+## v0.2.0
 
-- Builds under D68 value semantics: locals the package changes in place
-  are declared with `var` (applied with `anvil fix`). No API change.
+- Requires `ferron >=0.7.0-alpha.1`; CI pins `FERRON_REF: v0.7.0-alpha.1`
+  and builds `anvil` with the compiler's `scripts/build-anvil`.
 - Builds under D70, where counts and indexes are `Int`: `Database.execute`
   and `Transaction.execute` return `Result[Int, SqliteError]` (was
-  `usize`). Migration: drop `usize` conversions and suffixes on the count.
+  `usize`). **Migration:** drop `usize` conversions and suffixes on the
+  count.
+- Builds under D68 value semantics: locals the package changes in place
+  are declared with `var` (applied with `anvil fix`).
+- Test types use natural names (`User`, `Person`) again: the compiler no
+  longer shares a generic instance between same-named types of different
+  packages.
+- `include/sqlite3_handles.h` and the generated `src/sys/sqlite3_handles.fer`
+  are gone: `anvil ffi gen` now makes opaque types `pub` on its own. The
+  `sqlite3_ptr` and `sqlite3_stmt_ptr` aliases went with them (they were
+  package-internal).
 
 ## v0.1.0
 
