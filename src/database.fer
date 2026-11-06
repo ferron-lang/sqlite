@@ -324,7 +324,7 @@ fn bind(db: Ptr[sqlite3], stmt: Ptr[sqlite3_stmt], params: Value) -> Result[Unit
         if text.starts_with("?") {
           return Err(failure(Parameter, "parameter {index} has no name, so a struct or map cannot bind it"))
         }
-        match entries.get(text.slice(1, text.len())) {
+        match entries.get(text[1..]) {
           Some(item) => bind_one(db, stmt, index, item)?
           None => return Err(failure(Parameter, "no value for parameter {text}"))
         }
