@@ -1,9 +1,5 @@
-# `anvil ffi gen` writes `src/sys/sqlite3.fer` from the system `sqlite3.h`
-# and `src/sys/sqlite3_handles.fer` from `include/sqlite3_handles.h`;
-# `anvil ffi gen --check` compares them in CI. The second header only names
-# `sqlite3*` and `sqlite3_stmt*`: `ffi gen` makes an opaque type `pub` only
-# when another generated module names it, and the safe layer's resource
-# fields need `sqlite3` and `sqlite3_stmt`.
+# `anvil ffi gen` writes `src/sys/sqlite3.fer` from the system `sqlite3.h`;
+# `anvil ffi gen --check` compares it in CI.
 #
 # Every SQLite 3.x header declares a different set of functions (each
 # release adds some, and compile options such as SQLITE_OMIT_* hide others),
@@ -15,14 +11,14 @@
 # parameters are skipped (FFI stage 1); `src/sys/hand.fer` declares
 # `sqlite3_bind_text` by hand.
 [generate]
-headers = ["sqlite3.h", "sqlite3_handles.h"]
-include = ["include", "/usr/include"]
+headers = ["sqlite3.h"]
+include = ["/usr/include"]
 output = "src/sys"
 allow = "^sqlite3_"
 ignore = "."
 require = [
   # Types.
-  "sqlite3_stmt", "sqlite3_int64", "sqlite3_ptr", "sqlite3_stmt_ptr",
+  "sqlite3_stmt", "sqlite3_int64",
   # Connections (3.0; `sqlite3_close_v2` 3.7.14, `total_changes64` 3.37).
   "sqlite3_open", "sqlite3_close_v2", "sqlite3_errmsg", "sqlite3_extended_errcode",
   "sqlite3_last_insert_rowid", "sqlite3_total_changes64", "sqlite3_complete",

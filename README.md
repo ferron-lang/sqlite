@@ -115,13 +115,11 @@ anvil fmt
 
 ## C bindings
 
-`anvil ffi gen` writes `src/sys/sqlite3.fer` from `sqlite3.h` and
-`src/sys/sqlite3_handles.fer` from `include/sqlite3_handles.h` (two pointer
-typedefs that make the generated `sqlite3` and `sqlite3_stmt` types visible
-to the safe layer). `ffi.toml` pins the binding to the functions the safe
-layer calls (`ignore = "."` plus a `require` list), so the output is the
-same for every SQLite 3.x header from 3.37 on; using another function means
-adding it to `require`. `sqlite3_bind_text` takes a destructor callback,
+`anvil ffi gen` writes `src/sys/sqlite3.fer` from `sqlite3.h`. `ffi.toml`
+pins the binding to the functions the safe layer calls (`ignore = "."` plus
+a `require` list), so the output is the same for every SQLite 3.x header
+from 3.37 on; using another function means adding it to `require`.
+`sqlite3_bind_text` takes a destructor callback,
 which the generator skips: `src/sys/hand.fer` declares it with that
 parameter as an address-sized integer, and the package always passes
 `SQLITE_TRANSIENT` (`-1`), so SQLite copies the text.
