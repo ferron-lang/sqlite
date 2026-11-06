@@ -3,6 +3,13 @@
 Versions stay `v0.x` until the API settles: the minor version marks changes
 that may break callers, the patch version marks fixes.
 
+## v0.3.0
+
+- Requires `ferron >=0.8.0-alpha.1`; CI pins `FERRON_REF: v0.8.0-alpha.1`.
+  The package slices with ranges (`text[1..]`), since Ferron 0.8 removed
+  the `slice` methods (D77). The API is unchanged: callers move to
+  Ferron 0.8 and change nothing else.
+
 ## v0.2.0
 
 - Requires `ferron >=0.7.0-alpha.1`; CI pins `FERRON_REF: v0.7.0-alpha.1`

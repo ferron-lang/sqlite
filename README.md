@@ -11,7 +11,7 @@ Add it to the `anvil.toml` of a package as a git dependency pinned by tag:
 
 ```toml
 [dependencies]
-sqlite = { git = "https://github.com/ferron-lang/sqlite", tag = "v0.2.0" }
+sqlite = { git = "https://github.com/ferron-lang/sqlite", tag = "v0.3.0" }
 ```
 
 and import it as `sqlite`. Programs using the package link the system
