@@ -367,7 +367,7 @@ fn bind_one(db: Ptr[sqlite3], stmt: Ptr[sqlite3_stmt], index: Int, value: Value)
       at,
       v,
       v.byte_len().try_to_i32().unwrap_or(-1),
-      CFn[Ptr[Unit], Unit].of(Ptr[Unit].from_address(SQLITE_TRANSIENT))
+      CFn[Ptr[Unit], Unit].from_ptr(Ptr[Unit].from_address(SQLITE_TRANSIENT))
     )
     Value.BigInt(digits) => return Err(failure(Parameter, "{digits} does not fit a 64-bit integer"))
     _ => return Err(failure(Parameter, "a list or map cannot bind a parameter"))
