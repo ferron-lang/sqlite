@@ -7,6 +7,9 @@ that may break callers, the patch version marks fixes.
 
 - Builds under D68 value semantics: locals the package changes in place
   are declared with `var` (applied with `anvil fix`). No API change.
+- Builds under D70, where counts and indexes are `Int`: `Database.execute`
+  and `Transaction.execute` return `Result[Int, SqliteError]` (was
+  `usize`). Migration: drop `usize` conversions and suffixes on the count.
 
 ## v0.1.0
 
