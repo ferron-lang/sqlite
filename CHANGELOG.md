@@ -3,14 +3,20 @@
 Versions stay `v0.x` until the API settles: the minor version marks changes
 that may break callers, the patch version marks fixes.
 
-## Unreleased
+## v0.4.0
 
+- **Needs Ferron `main` at `e9ac4addc` or later until 0.9.** The
+  requirement stays `ferron = ">=0.8.0-alpha.1"`, but a 0.8 release does
+  not build this version; CI pins `FERRON_REF` to that commit. Stay on
+  `v0.3.0` with Ferron 0.8.
 - Regenerated with the D78 `anvil ffi gen`: `sqlite3_column_blob` returns
   `Ptr[Unit]` (C's `void*`), cast to bytes where blobs are read. No API
   change.
 - `sqlite3_bind_text` is generated too (`src/sys/hand.fer` is gone): its
   destructor is a `CFn` built from the `SQLITE_TRANSIENT` address with
-  D78's `CFn.of(Ptr.from_address(..))`. No API change.
+  `CFn.from_ptr(Ptr.from_address(..))` (D78, renamed in D79). No API change.
+- Builds under D85 (only integer `try_to_*` conversions, which the package
+  already used) and D88 (no `comptime`) with nothing to migrate.
 
 ## v0.3.0
 
