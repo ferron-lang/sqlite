@@ -8,7 +8,7 @@ env:
   # The ferron-lang/ferron release tag (`vX.Y.Z-alpha.N`) or commit this
   # package is tested with; move it together with the `ferron` requirement
   # in anvil.toml.
-  FERRON_REF: v0.6.0-alpha.1
+  FERRON_REF: v0.7.0-alpha.1
 
 jobs:
   check:
@@ -32,7 +32,7 @@ jobs:
       - name: Build anvil
         working-directory: .ferron
         run: |
-          cargo build --release -p anvil-cli
+          scripts/build-anvil --release
           echo "$PWD/target/release" >> "$GITHUB_PATH"
       - run: anvil check
       # The tests close every connection, statement, and transaction; the
