@@ -378,18 +378,15 @@ fn size(bytes: i32) -> usize {
 
 // --- Tests ------------------------------------------------------------------
 
-// Test types carry a `Test` prefix: a consumer's type of the same name
-// would otherwise share their generic instantiations (a compiler bug).
-
 #[derive(Data)]
-struct TestNewUser {
+struct NewUser {
   name: String,
   age: Option[Int],
   admin: Bool,
 }
 
 #[derive(Data)]
-struct TestUser {
+struct User {
   id: Int,
   name: String,
   age: Option[Int],
@@ -397,12 +394,12 @@ struct TestUser {
 }
 
 #[derive(Data)]
-struct TestStrict {
+struct Strict {
   id: String,
 }
 
 #[derive(Data)]
-struct TestLimit {
+struct Limit {
   n: Int,
 }
 
@@ -434,7 +431,7 @@ fn memory_round_trip() -> Unit {
   )
   expect.equal(exec(db, "INSERT INTO users (name, age, admin) VALUES (?, ?, ?)", ("ann", 31, true)), "ok 1")
   expect.equal(db.last_insert_rowid(), 1)
-  let users: Result[List[TestUser], SqliteError] = db.query("SELECT * FROM users WHERE name = ?", "ann")
+  let users: Result[List[User], SqliteError] = db.query("SELECT * FROM users WHERE name = ?", "ann")
   expect.equal(
     users.expect_ok("query").map(|user| "{user.id} {user.name} {user.age} {user.admin}"),
     ["1 ann Some(31) 1"]
@@ -457,7 +454,7 @@ fn parameters() -> Unit {
     exec(
       db,
       "INSERT INTO users (name, age, admin) VALUES (:name, :age, :admin)",
-      TestNewUser { name: "dee", age: None, admin: false }
+      NewUser { name: "dee", age: None, admin: false }
     ),
     "ok 1"
   )
@@ -471,7 +468,7 @@ fn parameters() -> Unit {
     exec(db, "INSERT INTO users (name, admin) VALUES (?, 0)", "o'brien'); DROP TABLE users; --"),
     "ok 1"
   )
-  let users: Result[List[TestUser], SqliteError] = db.query("SELECT * FROM users WHERE id > ? ORDER BY id", 0)
+  let users: Result[List[User], SqliteError] = db.query("SELECT * FROM users WHERE id > ? ORDER BY id", 0)
   expect.equal(
     users.expect_ok("users").map(|user| "{user.id} {user.name} {user.age} {user.admin}"),
     [
@@ -484,7 +481,7 @@ fn parameters() -> Unit {
     ],
   )
   // A repeated name is one parameter.
-  let same: Result[List[TestUser], SqliteError] = db.query("SELECT * FROM users WHERE age > :n OR id = :n", TestLimit { n: 40 })
+  let same: Result[List[User], SqliteError] = db.query("SELECT * FROM users WHERE age > :n OR id = :n", Limit { n: 40 })
   expect.equal(same.expect_ok("same").len(), 2)
   // Binding errors.
   expect.equal(
@@ -511,7 +508,7 @@ fn parameters() -> Unit {
     exec(
       db,
       "INSERT INTO users (name) VALUES (:missing)",
-      TestNewUser { name: "x", age: None, admin: false }
+      NewUser { name: "x", age: None, admin: false }
     ),
     "error Parameter: no value for parameter :missing"
   )
@@ -534,7 +531,7 @@ fn decode_error() -> Unit {
     exec(db, "CREATE TABLE users (id INTEGER PRIMARY KEY); INSERT INTO users VALUES (1)", Value.Null),
     "ok 1"
   )
-  let strict: Result[List[TestStrict], SqliteError] = db.query("SELECT id FROM users", Value.Null)
+  let strict: Result[List[Strict], SqliteError] = db.query("SELECT id FROM users", Value.Null)
   match strict {
     Ok(_) => expect.equal("decoded", "a Decode error")
     Err(error) => {

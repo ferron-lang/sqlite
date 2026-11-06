@@ -113,11 +113,6 @@ anvil test          # every module's tests; `anvil test pkg.database` filters
 anvil fmt
 ```
 
-Test types carry a `Test` prefix (`TestUser`, `TestPerson`). They work
-around a compiler bug in `v0.6.0-alpha.1`: a consumer's type with the same
-name as a type this package instantiates a generic with (`query[User, _]`)
-shares that instantiation, so its rows would decode as the package's type.
-
 ## C bindings
 
 `anvil ffi gen` writes `src/sys/sqlite3.fer` from `sqlite3.h` and
