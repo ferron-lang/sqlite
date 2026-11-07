@@ -7,8 +7,8 @@ on:
 env:
   # The ferron-lang/ferron release tag (`vX.Y.Z-alpha.N`) or commit this
   # package is tested with; move it together with the `ferron` requirement
-  # in anvil.toml. A main commit until Ferron 0.9 ships D78-D82.
-  FERRON_REF: e9ac4addc6d7f803047ed17f18516fb32c01d1a4
+  # in anvil.toml.
+  FERRON_REF: v0.9.0-alpha.1
 
 jobs:
   check:

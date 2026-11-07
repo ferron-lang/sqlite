@@ -3,6 +3,13 @@
 Versions stay `v0.x` until the API settles: the minor version marks changes
 that may break callers, the patch version marks fixes.
 
+## v0.4.1
+
+- Requires `ferron >=0.9.0-alpha.1`, the first release with what `v0.4.0`
+  needed from Ferron main; CI pins `FERRON_REF: v0.9.0-alpha.1`. No code
+  change: D85-D88 need nothing here (no top-level `let` or `var`, no
+  `comptime`, no non-integer `try_to_*`).
+
 ## v0.4.0
 
 - **Needs Ferron `main` at `e9ac4addc` or later until 0.9.** The
