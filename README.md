@@ -1,6 +1,6 @@
 # sqlite
 
-Ferron bindings to the system SQLite 3 (`libsqlite3`, any 3.x from 3.37):
+[Ferron](https://ferron-lang.dev) bindings to the system SQLite 3 (`libsqlite3`, any 3.x from 3.37):
 the generated `extern "C"` module in `src/sys/` (package-internal) and a safe
 layer over it with the API of the former `std.sqlite`, backed by the real
 engine (indexes, joins, aggregates, WAL, everything SQLite has).
